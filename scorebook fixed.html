@@ -542,6 +542,8 @@ function App(){
       setBats(bs=>bs.map((v,i)=>i===curSide?advancedBat:v));
       setSide(ns);setInn(ni);setOuts(0);setBases([false,false,false]);
       setSubTab(null);setConfirmClear(false);
+      // 試合終了 → 少し待ってから保存（終了）タブへ自動で移動
+      setTimeout(()=>{setTab("end");showToast("試合終了！結果を保存できます","#22c55e");},1200);
       return;
     }
     if(extendTo!=null)setCurInningsLimit(extendTo);
@@ -1496,12 +1498,17 @@ function App(){
                   let pIdx=lineups[defSideIdx].findIndex(p=>p.pos==="投");
                   const dhMode=useDH||pIdx<0;
                   if(pIdx<0)pIdx=0;
+                  // 現在の投手名：lineups上で「投」のポジションの選手を優先
+                  // pitcherLogはあくまで球数追跡用。守備交代後はlineups側が正しい。
+                  const currentPitcherName=pIdx>=0&&lineups[defSideIdx][pIdx]?.name
+                    ?lineups[defSideIdx][pIdx].name
+                    :(cp&&cp.name?cp.name:"");
                   return(
                     <div style={{padding:"10px 14px"}}>
                       <div style={{fontSize:10,color:"#475569",marginBottom:8}}>守備側「{teams[defSideIdx]}」の投手を交代</div>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
                         <span style={{fontSize:11,color:"#475569"}}>現在の投手</span>
-                        <span style={{background:"#1e293b",borderRadius:6,padding:"4px 12px",fontSize:13,fontWeight:700,color:"#fca5a5"}}>{cp&&cp.name?cp.name:(lineups[defSideIdx][pIdx]?.name||"")}</span>
+                        <span style={{background:"#1e293b",borderRadius:6,padding:"4px 12px",fontSize:13,fontWeight:700,color:"#fca5a5"}}>{currentPitcherName||"未設定"}</span>
                         <span style={{fontSize:11,color:"#64748b"}}>{currentPitcherPitches(side)}球</span>
                       </div>
                       {dhMode?(
@@ -1539,9 +1546,14 @@ function App(){
                 <Diamond interactive={over}/>
                 <div style={{width:64,textAlign:"center"}}>
                   <div style={{fontSize:9,color:"#64748b",marginBottom:2}}>投手球数</div>
-                  {(()=>{const cp=currentPitcher(side);return(
+                  {(()=>{
+                    const cp=currentPitcher(side);
+                    const dIdx=1-side;
+                    const pitcherInLineup=lineups[dIdx]&&lineups[dIdx].find(p=>p.pos==="投");
+                    const displayName=pitcherInLineup?pitcherInLineup.name:(cp&&cp.name?cp.name:"");
+                    return(
                     <>
-                      {cp&&cp.name&&<div style={{fontSize:9,color:C.badge,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cp.name}</div>}
+                      {displayName&&<div style={{fontSize:9,color:C.badge,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>}
                       <div style={{fontSize:24,fontWeight:700,color:C.badge,lineHeight:1.1}}>{currentPitcherPitches(side)||"—"}</div>
                       <div style={{fontSize:8,color:"#475569",marginTop:2}}>今{ab.pitches.length}球 / 計{totalPitchesAgainst(side)}</div>
                     </>
@@ -1874,6 +1886,18 @@ function App(){
 
           {tab==="end"&&(
             <div style={{padding:14,paddingBottom:80}}>
+              {gameOver&&(()=>{
+                const r0=totalR(0),r1=totalR(1);
+                const winner=r0>r1?teams[0]:r1>r0?teams[1]:null;
+                return(
+                  <div style={{background:"linear-gradient(135deg,#052e16,#16a34a)",borderRadius:14,padding:"16px 18px",marginBottom:16,textAlign:"center",border:"1px solid #22c55e"}}>
+                    <div style={{fontSize:11,color:"#bbf7d0",marginBottom:4,letterSpacing:2}}>🏁 試合終了</div>
+                    <div style={{fontSize:24,fontWeight:700,color:"#fff",marginBottom:4}}>{teams[0]} {r0} - {r1} {teams[1]}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#fcd34d"}}>{winner?winner+" の勝利！":"引き分け"}</div>
+                    <div style={{fontSize:10,color:"#bbf7d0",marginTop:6}}>↓ 下のボタンから結果を保存できます</div>
+                  </div>
+                );
+              })()}
               <div style={{background:C.c,borderRadius:12,padding:14,marginBottom:16,border:"1px solid "+C.b}}>
                 <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.p}}>現在の試合</div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
